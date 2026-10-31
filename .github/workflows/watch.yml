@@ -1,0 +1,29 @@
+name: مراقب الأخبار الرسمية
+on:
+  schedule:
+    - cron: '17 * * * *'
+  push:
+    branches: [main]
+    paths: ['watch/trial.json', '.github/scripts/watch.py', '.github/workflows/watch.yml']
+permissions:
+  contents: write
+  issues: write
+concurrency: watch
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: قراءة العناوين
+        run: python3 .github/scripts/watch.py
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+      - name: حفظ ما رآه
+        run: |
+          git config user.name 'hijri-data watch'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add watch
+          git diff --cached --quiet || { git commit -q -m 'المراقب: تحديث السجل' && git push -q; }
