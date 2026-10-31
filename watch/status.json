@@ -1,0 +1,33 @@
+{
+ "ran": "2026-10-31T21:09+00:00",
+ "event": "push",
+ "first": true,
+ "opened": [],
+ "queries": {
+  "site:spa.gov.sa هلال when:3d": {
+   "items": 10,
+   "official": 10,
+   "hits": 0
+  },
+  "site:spa.gov.sa الديوان الملكي رؤية when:3d": {
+   "items": 3,
+   "official": 3,
+   "hits": 0
+  },
+  "site:spa.gov.sa وزارة التعليم إجازة when:3d": {
+   "items": 0,
+   "official": 0,
+   "hits": 0
+  },
+  "site:spa.gov.sa التقويم الدراسي when:3d": {
+   "items": 1,
+   "official": 1,
+   "hits": 0
+  },
+  "site:moe.gov.sa التقويم الدراسي when:3d": {
+   "items": 0,
+   "official": 0,
+   "hits": 0
+  }
+ }
+}
