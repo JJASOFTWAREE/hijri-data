@@ -1,8 +1,10 @@
 {
- "ran": "2026-10-31T21:09+00:00",
+ "ran": "2026-10-31T21:10+00:00",
  "event": "push",
- "first": true,
- "opened": [],
+ "first": false,
+ "opened": [
+  "https://github.com/JJASOFTWAREE/hijri-data/issues/1"
+ ],
  "queries": {
   "site:spa.gov.sa هلال when:3d": {
    "items": 10,
