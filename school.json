@@ -1,6 +1,7 @@
 {
   "_note": "التقويم الدراسي الرسمي لوزارة التعليم. انظر data/README_AR.md قبل التعديل",
   "updated": "2026-10-31",
+  "tawtheeqMinVersion": 15,
   "general": [
     {
       "year": 1448,
