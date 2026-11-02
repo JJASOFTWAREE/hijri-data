@@ -3,7 +3,7 @@
 It only reads public headlines and never edits sighting.json or school.json: publishing waits for the owner.
 Standard library only, so the workflow needs no installs.
 """
-import html, json, os, re, sys, urllib.parse, urllib.request
+import html, json, os, re, sys, time, urllib.parse, urllib.request
 from datetime import datetime, timezone
 
 OFFICIAL = ('spa.gov.sa', 'moe.gov.sa')
@@ -17,6 +17,10 @@ OWNER = 'JJASOFTWAREE'
 STATE = 'watch/seen.json'
 STATUS = 'watch/status.json'
 TRIAL = 'watch/trial.json'
+FAILS = 'watch/fails.json'
+ATTEMPTS, PAUSE = 3, 15
+# The news search sometimes refuses a whole run; the owner is emailed only when it stays down for six hours.
+ALARM_AFTER = 6
 
 
 COURT = ('المحكمة العليا', 'الديوان الملكي', 'مجلس القضاء')
@@ -40,10 +44,20 @@ def relevant(kind, title):
     return any(w in t for w in SUBJECT) and any(w in t for w in CHANGE)
 
 
+def download(url):
+    for attempt in range(ATTEMPTS):
+        try:
+            with urllib.request.urlopen(urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'}), timeout=20) as r:
+                return r.read().decode('utf-8')
+        except Exception:
+            if attempt == ATTEMPTS - 1:
+                raise
+            time.sleep(PAUSE)
+
+
 def fetch(query):
     url = 'https://news.google.com/rss/search?' + urllib.parse.urlencode({'q': query, 'hl': 'ar', 'gl': 'SA', 'ceid': 'SA:ar'})
-    with urllib.request.urlopen(urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'}), timeout=30) as r:
-        body = r.read().decode('utf-8')
+    body = download(url)
     items = []
     for raw in re.findall(r'<item>(.*?)</item>', body, re.S):
         def tag(name):
@@ -121,8 +135,15 @@ def main():
         json.dump({'ran': now.isoformat(timespec='minutes'), 'event': event, 'first': first, 'opened': opened, 'queries': status},
                   open(STATUS, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
     print(json.dumps({'first': first, 'opened': opened, 'queries': status}, ensure_ascii=False, indent=1))
+    fails = json.load(open(FAILS, encoding='utf-8'))['count'] if os.path.exists(FAILS) else 0
     if all('error' in s for s in status.values()):
-        sys.exit('Every query failed')
+        fails += 1
+        json.dump({'count': fails, 'last': now.isoformat(timespec='minutes')}, open(FAILS, 'w', encoding='utf-8'), indent=1)
+        if fails >= ALARM_AFTER:
+            sys.exit(f'Every query failed in {fails} runs in a row')
+        print(f'Every query failed ({fails} in a row); the owner is alerted at {ALARM_AFTER}.')
+    elif fails:
+        os.remove(FAILS)
 
 
 if __name__ == '__main__':

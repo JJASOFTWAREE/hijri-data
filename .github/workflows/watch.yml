@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: قراءة العناوين
         run: python3 .github/scripts/watch.py
         env:
@@ -22,6 +22,7 @@ jobs:
           REPO: ${{ github.repository }}
           EVENT: ${{ github.event_name }}
       - name: حفظ ما رآه
+        if: ${{ !cancelled() }}
         run: |
           git config user.name 'hijri-data watch'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
