@@ -1,12 +1,14 @@
 {
- "ran": "2026-11-02T12:13+00:00",
- "event": "push",
+ "ran": "2026-11-05T07:37+00:00",
+ "event": "schedule",
  "first": false,
- "opened": [],
+ "opened": [
+  "https://github.com/JJASOFTWAREE/hijri-data/issues/2"
+ ],
  "queries": {
   "site:spa.gov.sa هلال when:3d": {
-   "items": 16,
-   "official": 16,
+   "items": 26,
+   "official": 26,
    "hits": 0
   },
   "site:spa.gov.sa الديوان الملكي رؤية when:3d": {
@@ -15,19 +17,19 @@
    "hits": 0
   },
   "site:spa.gov.sa وزارة التعليم إجازة when:3d": {
-   "items": 0,
-   "official": 0,
-   "hits": 0
-  },
-  "site:spa.gov.sa التقويم الدراسي when:3d": {
-   "items": 0,
-   "official": 0,
-   "hits": 0
-  },
-  "site:moe.gov.sa التقويم الدراسي when:3d": {
    "items": 1,
    "official": 1,
    "hits": 0
+  },
+  "site:spa.gov.sa التقويم الدراسي when:3d": {
+   "items": 8,
+   "official": 8,
+   "hits": 0
+  },
+  "site:moe.gov.sa التقويم الدراسي when:3d": {
+   "items": 16,
+   "official": 16,
+   "hits": 1
   }
  }
 }
