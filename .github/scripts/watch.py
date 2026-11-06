@@ -4,7 +4,7 @@ It only reads public headlines and never edits sighting.json or school.json: pub
 Standard library only, so the workflow needs no installs.
 """
 import html, json, os, re, sys, time, urllib.parse, urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 OFFICIAL = ('spa.gov.sa', 'moe.gov.sa')
 QUERIES = {
@@ -19,6 +19,8 @@ STATUS = 'watch/status.json'
 TRIAL = 'watch/trial.json'
 FAILS = 'watch/fails.json'
 ATTEMPTS, PAUSE = 3, 15
+# The news search re-indexes old ministry pages as new; an article whose own date is older than this is skipped.
+STALE_DAYS = 45
 # The news search sometimes refuses a whole run; the owner is emailed only when it stays down for six hours.
 ALARM_AFTER = 6
 
@@ -44,11 +46,12 @@ def relevant(kind, title):
     return any(w in t for w in SUBJECT) and any(w in t for w in CHANGE)
 
 
-def download(url):
+def download(url, data=None, headers=None):
     for attempt in range(ATTEMPTS):
         try:
-            with urllib.request.urlopen(urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'}), timeout=20) as r:
-                return r.read().decode('utf-8')
+            request = urllib.request.Request(url, data=data, headers={'User-Agent': 'Mozilla/5.0', **(headers or {})})
+            with urllib.request.urlopen(request, timeout=20) as r:
+                return r.read().decode('utf-8', 'replace')
         except Exception:
             if attempt == ATTEMPTS - 1:
                 raise
@@ -70,6 +73,58 @@ def fetch(query):
     return items
 
 
+MONTHS = {'يناير': 1, 'فبراير': 2, 'مارس': 3, 'أبريل': 4, 'ابريل': 4, 'إبريل': 4, 'مايو': 5, 'يونيو': 6, 'يوليو': 7,
+          'أغسطس': 8, 'اغسطس': 8, 'سبتمبر': 9, 'أكتوبر': 10, 'اكتوبر': 10, 'نوفمبر': 11, 'ديسمبر': 12}
+
+
+def article_url(link):
+    """The search gives its own redirect link; this asks it for the publisher's address, as its page script does."""
+    gid = urllib.parse.urlparse(link).path.rsplit('/', 1)[-1]
+    page = download(f'https://news.google.com/rss/articles/{gid}')
+    sg = re.search(r'data-n-a-sg="([^"]+)"', page).group(1)
+    ts = re.search(r'data-n-a-ts="([^"]+)"', page).group(1)
+    inner = ['garturlreq', [['X', 'X', ['X', 'X'], None, None, 1, 1, 'US:en', None, 1, None, None, None, None, None, 0, 1],
+                            'X', 'X', 1, [1, 1, 1], 1, 1, None, 0, 0, None, 0], gid, int(ts), sg]
+    body = 'f.req=' + urllib.parse.quote(json.dumps([[['Fbv4je', json.dumps(inner)]]]))
+    reply = download('https://news.google.com/_/DotsSplashUi/data/batchexecute', data=body.encode(),
+                     headers={'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'})
+    return json.loads(json.loads(reply.split('\n\n', 1)[1])[0][2])[1]
+
+
+def hijri_year(day):
+    """Close enough to tell one Hijri year from the next (the mean year is 354.367 days from 16 July 622)."""
+    return int((day - datetime(622, 7, 16, tzinfo=timezone.utc)).days / 354.367) + 1
+
+
+def stale(text, now):
+    """True only when every date the page shows is old; a page with no date, or any recent date, is never stale."""
+    t = plain(text)
+    days = []
+    for d, m, y in re.findall(r'(\d{1,2})\s+(' + '|'.join(MONTHS) + r')\s+(\d{4})\s*م', t):
+        try:
+            days.append(datetime(int(y), MONTHS[m], int(d), tzinfo=timezone.utc))
+        except ValueError:
+            pass
+    if days:
+        return max(days) < now - timedelta(days=STALE_DAYS)
+    gregorian = [int(y) for y in re.findall(r'(?<!\d)(\d{4})\s*م', t) + re.findall(r'(?<!\d)(\d{4})\s*/\s*\d{1,2}\s*/\s*\d{1,2}', t)]
+    hijri = [int(y) for y in re.findall(r'(?<!\d)(1[34]\d\d)\s*ه', t)]
+    return bool(gregorian and hijri) and max(gregorian) < now.year and max(hijri) < hijri_year(now)
+
+
+def article_check(item, now):
+    """Fills the publisher's link and says whether the article is old. Any failure keeps the alert."""
+    try:
+        url = article_url(item['link'])
+        host = urllib.parse.urlparse(url).hostname or ''
+        if not official(host):
+            return False
+        item['article'] = url
+        return stale(re.sub(r'<[^>]+>', ' ', download(url)), now)
+    except Exception:
+        return False
+
+
 def official(host):
     return any(host == d or host.endswith('.' + d) for d in OFFICIAL)
 
@@ -82,7 +137,7 @@ def open_issue(item, kind, trial=False):
         f'- **الخبر:** {item["title"]}',
         f'- **المصدر:** {item["host"]}',
         f'- **التاريخ:** {item["date"]}',
-        f'- **الرابط:** {item["link"]}',
+        f'- **الرابط:** {item.get("article") or item["link"]}',
         '',
         'لم يُنشر أي تعديل. إذا كان فيه تغيير على التواريخ، أرسل في Claude: «شوف إشعار المراقب».',
         '',
@@ -102,7 +157,8 @@ def main():
     first = not os.path.exists(STATE)
     seen = [] if first else json.load(open(STATE, encoding='utf-8'))
     known = set(seen)
-    status, opened, changed = {}, [], first
+    status, opened, skipped, changed = {}, [], [], first
+    now = datetime.now(timezone.utc)
     for kind, queries in QUERIES.items():
         for query in queries:
             try:
@@ -117,8 +173,12 @@ def main():
                     continue
                 known.add(item['id']); seen.append(item['id']); changed = True
                 # The first run only learns what is already out there.
-                if not first:
-                    opened.append(open_issue(item, kind))
+                if first:
+                    continue
+                if article_check(item, now):
+                    skipped.append(item.get('article') or item['link'])
+                    continue
+                opened.append(open_issue(item, kind))
     event = os.environ.get('EVENT', '')
     if event == 'push' and os.path.exists(TRIAL):
         trial = json.load(open(TRIAL, encoding='utf-8'))
@@ -130,11 +190,10 @@ def main():
         json.dump(seen[-500:], open(STATE, 'w', encoding='utf-8'), ensure_ascii=False, indent=0)
     # The status file is the run's report; it is written when something happened, on a push, and once a month
     # (a scheduled workflow stops after 60 quiet days).
-    now = datetime.now(timezone.utc)
     if changed or opened or event == 'push' or (now.day == 1 and now.hour == 0):
-        json.dump({'ran': now.isoformat(timespec='minutes'), 'event': event, 'first': first, 'opened': opened, 'queries': status},
-                  open(STATUS, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
-    print(json.dumps({'first': first, 'opened': opened, 'queries': status}, ensure_ascii=False, indent=1))
+        json.dump({'ran': now.isoformat(timespec='minutes'), 'event': event, 'first': first, 'opened': opened, 'skipped_old': skipped,
+                   'queries': status}, open(STATUS, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+    print(json.dumps({'first': first, 'opened': opened, 'skipped_old': skipped, 'queries': status}, ensure_ascii=False, indent=1))
     fails = json.load(open(FAILS, encoding='utf-8'))['count'] if os.path.exists(FAILS) else 0
     if all('error' in s for s in status.values()):
         fails += 1
