@@ -1,34 +1,36 @@
 {
- "ran": "2026-11-06T03:16+00:00",
- "event": "push",
+ "ran": "2026-11-13T07:39+00:00",
+ "event": "schedule",
  "first": false,
  "opened": [],
- "skipped_old": [],
+ "skipped_old": [
+  "https://www.spa.gov.sa/464145"
+ ],
  "queries": {
   "site:spa.gov.sa هلال when:3d": {
-   "items": 25,
-   "official": 25,
+   "items": 17,
+   "official": 17,
    "hits": 0
   },
   "site:spa.gov.sa الديوان الملكي رؤية when:3d": {
-   "items": 8,
-   "official": 8,
+   "items": 2,
+   "official": 2,
    "hits": 0
   },
   "site:spa.gov.sa وزارة التعليم إجازة when:3d": {
-   "items": 0,
-   "official": 0,
-   "hits": 0
+   "items": 1,
+   "official": 1,
+   "hits": 1
   },
   "site:spa.gov.sa التقويم الدراسي when:3d": {
-   "items": 8,
-   "official": 8,
-   "hits": 0
+   "items": 2,
+   "official": 2,
+   "hits": 1
   },
   "site:moe.gov.sa التقويم الدراسي when:3d": {
-   "items": 42,
-   "official": 42,
-   "hits": 3
+   "items": 10,
+   "official": 10,
+   "hits": 0
   }
  }
 }
